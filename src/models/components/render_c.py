@@ -1,4 +1,4 @@
-from models.components.component import Component
+from src.models.components.component import Component
 
 RENDER_COMPONENT_KEY = "r_component"
 

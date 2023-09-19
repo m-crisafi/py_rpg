@@ -1,4 +1,4 @@
-from models.object import Object
+from src.models.object import Object
 
 
 class Component(Object):

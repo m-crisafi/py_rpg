@@ -5,4 +5,5 @@ class Tilemap:
 
     def __init__(self, filename: str):
         self.xml = xml.parse(filename)
-        self.impassable: list[] = None
+        self.impassable: list[tuple(int, int)] = None
+    
