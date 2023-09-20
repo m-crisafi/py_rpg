@@ -3,18 +3,21 @@ import pygame as py
 from tilemap import Tilemap
 from tileset import *
 
+PADDING = 20
+SCREEN_H_MAX = 900
 SCREEN_WIDTH = 1500
-SCREEN_HEIGHT = 900
-CELL_SIZE = 20
+SCREEN_HEIGHT = SCREEN_H_MAX
+MAP_HEIGHT = SCREEN_H_MAX - PADDING * 2
+MAG_VALUES = [172, 86, 43, 20, 10]
 
 TILEMAPS_FILEPATH = "../resources/maps/tm/"
 TILESETS_FILEPATH = "../resources/maps/ts/"
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 SELECTED_COLOR = (0, 255, 0)
+GRID_COLOR = (140, 140, 140)
 MAP_COLOR = (190, 190, 190)
 BG_COLOR = WHITE
-PADDING = 20
 
 TILESET_START = (20, 20)
 
@@ -29,21 +32,27 @@ class Controller:
         self.screen = py.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.tileset = Tileset(TILESETS_FILEPATH + "castle.png", 20, TILESET_START)
         pos = (self.tileset.rect.x + self.tileset.rect.width + PADDING, TILESET_START[1])
+
         self.map_rect = py.Rect(
             pos[0],
             pos[1],
-            self.screen.get_width() - pos[0] - PADDING,
-            self.screen.get_height() - pos[1] - PADDING)
+            MAP_HEIGHT,
+            MAP_HEIGHT)
+
         self.mid_map = self.map_rect.midtop[0], self.map_rect.midleft[1]
         self.tilemap = Tilemap(pos, TILEMAPS_FILEPATH + "start.json")
-        self.tilemap.set_rect_centered_on(self.mid_map)
 
         self.copy_buffer = None
         self.running = True
         self.dragging = False
         self.selecting = False
         self.show_grid = False
+        self.selected_magnification = 3
         self.editing_passable = False
+
+        self.cam_pos = [0, 0]
+        self.map_size = int(MAP_HEIGHT / self.get_selected_magnification())
+        self.tilemap.resize(self.get_selected_magnification())
 
     def loop(self):
         while self.running:
@@ -80,22 +89,25 @@ class Controller:
         py.draw.rect(self.screen, BLACK, self.map_rect, width=1)
 
         # draw whole world
-        for y in range(self.tilemap.height):
-            for x in range(self.tilemap.height):
-                rect = py.Rect(
-                    x * self.tilemap.cell_size + self.tilemap.rect.x,
-                    y * self.tilemap.cell_size + self.tilemap.rect.y,
-                    self.tilemap.cell_size,
-                    self.tilemap.cell_size)
-                idx = self.tilemap.tiles[y][x]
-                xy = self.flattened_to_xy(idx, self.tileset.width)
-                surf = self.tileset.tiles[xy[1]][xy[0]]
-                surf = py.transform.scale(surf, (self.tilemap.cell_size, self.tilemap.cell_size))
-                self.screen.blit(surf, rect)
+        for y in range(self.map_size):
+            for x in range(self.map_size):
+                nx = x + self.cam_pos[0]
+                ny = y + self.cam_pos[1]
+                if self.tilemap.point_on_map(nx, ny):
+                    rect = py.Rect(
+                        x * self.tilemap.cell_size + self.tilemap.rect.x,
+                        y * self.tilemap.cell_size + self.tilemap.rect.y,
+                        self.tilemap.cell_size,
+                        self.tilemap.cell_size)
+                    idx = self.tilemap.tiles[ny][nx]
+                    xy = self.flattened_to_xy(idx, self.tileset.width)
+                    surf = self.tileset.tiles[xy[1]][xy[0]]
+                    surf = py.transform.scale(surf, (self.tilemap.cell_size, self.tilemap.cell_size))
+                    self.screen.blit(surf, rect)
 
         # draw grids if true
         if self.show_grid:
-            self.draw_grid(self.tilemap.rect, self.tilemap.cell_size, (190, 190, 190))
+            self.draw_grid(self.map_rect, self.tilemap.cell_size, GRID_COLOR)
 
         # draw tile hover on map
         if self.mouse_collides_with_rect(pos, self.tilemap.rect) and self.tileset.selected_tile is not None:
@@ -176,18 +188,36 @@ class Controller:
                     self.running = False
                     return
 
-                if event.key == py.K_EQUALS:
-                    self.tilemap.resize(self.tilemap.cell_size + 10, self.mid_map)
+                if event.key == py.K_w:
+                    if self.cam_pos[1] > 0:
+                        self.cam_pos[1] -= 1
+                if event.key == py.K_s:
+                    if self.cam_pos[1] < self.map_size - 1:
+                        self.cam_pos[1] += 1
+                if event.key == py.K_a:
+                    if self.cam_pos[0] > 0:
+                        self.cam_pos[0] -= 1
+                if event.key == py.K_d:
+                    if self.cam_pos[0] < self.map_size - 1:
+                        self.cam_pos[0] += 1
 
                 if event.key == py.K_MINUS:
-                    self.tilemap.resize(self.tilemap.cell_size - 10, self.mid_map)
+                    if self.selected_magnification < len(MAG_VALUES) - 1:
+                        self.selected_magnification += 1
+                        self.tilemap.resize(self.get_selected_magnification())
+                        self.map_size = int(MAP_HEIGHT / self.get_selected_magnification())
+                if event.key == py.K_EQUALS:
+                    if self.selected_magnification > 0:
+                        self.selected_magnification -= 1
+                        self.tilemap.resize(self.get_selected_magnification())
+                        self.map_size = int(MAP_HEIGHT / self.get_selected_magnification())
 
                 # grow grid on D
                 if event.key == py.K_g:
                     self.show_grid = not self.show_grid
 
-                # save map on S
-                if event.key == py.K_s:
+                # save map on F
+                if event.key == py.K_f:
                     self.tilemap.save(self.tileset.filename)
                     print("Map saved [%s]" % self.tileset.filename)
 
@@ -211,7 +241,8 @@ class Controller:
                         pos = self.tilemap.selected_to_pos()
                         width = pos[1][0] - pos[0][0]
                         height = pos[1][1] - pos[0][1]
-                        self.copy_buffer = self.tilemap.get_sub_tiles(pos[0], width, height)
+                        pos = pos[0][0] + self.cam_pos[0], pos[0][1] + self.cam_pos[1]
+                        self.copy_buffer = self.tilemap.get_sub_tiles(pos, width, height)
                         self.selecting = False
                         self.tilemap.selected_start = None
                         self.tilemap.selected_end = None
@@ -225,20 +256,16 @@ class Controller:
                 if self.tileset.selected_tile is not None:
                     if event.key == py.K_UP:
                         if self.tileset.selected_tile[1] - 1 >= 0:
-                            self.tileset.selected_tile = self.tileset.selected_tile[0], self.tileset.selected_tile[
-                                1] - 1
+                            self.tileset.selected_tile = self.tileset.selected_tile[0], self.tileset.selected_tile[1] - 1
                     if event.key == py.K_DOWN:
                         if self.tileset.selected_tile[1] + 1 < self.tileset.height:
-                            self.tileset.selected_tile = self.tileset.selected_tile[0], self.tileset.selected_tile[
-                                1] + 1
+                            self.tileset.selected_tile = self.tileset.selected_tile[0], self.tileset.selected_tile[1] + 1
                     if event.key == py.K_LEFT:
                         if self.tileset.selected_tile[0] - 1 >= 0:
-                            self.tileset.selected_tile = self.tileset.selected_tile[0] - 1, self.tileset.selected_tile[
-                                1]
+                            self.tileset.selected_tile = self.tileset.selected_tile[0] - 1, self.tileset.selected_tile[1]
                     if event.key == py.K_RIGHT:
                         if self.tileset.selected_tile[0] + 1 < self.tileset.width:
-                            self.tileset.selected_tile = self.tileset.selected_tile[0] + 1, self.tileset.selected_tile[
-                                1]
+                            self.tileset.selected_tile = self.tileset.selected_tile[0] + 1, self.tileset.selected_tile[1]
 
             if self.dragging:
                 if self.mouse_collides_with_rect(pos, self.tilemap.rect):
@@ -246,7 +273,7 @@ class Controller:
                     # if a tile is selected, draw a preview
                     if self.tileset.selected_tile is not None:
                         self.tilemap.push_prev()
-                        self.tilemap.set(xy[0], xy[1],
+                        self.tilemap.set(xy[0] + self.cam_pos[0], xy[1] + self.cam_pos[1],
                                          self.tileset.selected_tile[1] * self.tileset.width +
                                          self.tileset.selected_tile[0])
                     elif not self.selecting:
@@ -319,14 +346,20 @@ class Controller:
                             for y in range(pos[0][1], pos[0][1] + y_len):
                                 for x in range(pos[0][0], pos[0][0] + x_len):
                                     if 0 <= x < self.tilemap.width and 0 <= y < self.tilemap.height:
-                                        self.tilemap.passable_layer[y][x] = not self.tilemap.passable_layer[y][x]
+                                        self.tilemap.invert_passable(self.pos_to_camera_pos((x, y)))
                         else:
                             xy = self.tilemap.mouse_to_xy(pos)
-                            self.tilemap.passable_layer[xy[1]][xy[0]] = not self.tilemap.passable_layer[xy[1]][xy[0]]
+                            self.tilemap.invert_passable(self.pos_to_camera_pos(xy))
                     self.tilemap.deselect()
 
                 self.dragging = False
                 self.selecting = False
+
+    def pos_to_camera_pos(self, pos: (int, int)):
+        return pos[0] + self.cam_pos[0], pos[1] + self.cam_pos[1]
+
+    def get_selected_magnification(self):
+        return MAG_VALUES[self.selected_magnification]
 
     def get_selected_tile(self) -> py.Surface:
         return self.tileset.tiles[self.tileset.selected_tile[1]][self.tileset.selected_tile[0]]

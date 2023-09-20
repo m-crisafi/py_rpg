@@ -49,20 +49,25 @@ class Tilemap:
     def set(self, x: int, y: int, value: int):
         self.tiles[y][x] = value
 
+    def invert_passable(self, pos: (int, int)):
+        self.passable_layer[pos[1]][pos[0]] = not self.passable_layer[pos[1]][pos[0]]
+
     def deselect(self):
         self.selected_start = None
         self.selected_end = None
 
-    def resize(self, cell_size: int, center_on: (int, int)):
+    def resize(self, cell_size: int):
         self.cell_size = cell_size
         self.rect.width = cell_size * self.width
         self.rect.height = cell_size * self.height
-        self.set_rect_centered_on(center_on)
 
     def mouse_to_xy(self, pos: (int, int)) -> (int, int):
         x = int((pos[0] - self.rect.x) / self.cell_size)
         y = int((pos[1] - self.rect.y) / self.cell_size)
         return x, y
+
+    def point_on_map(self, x: int, y: int):
+        return 0 <= x < self.width and 0 <= y < self.height
 
     def pop_prev(self):
         if len(self.prev_states) > 0:
