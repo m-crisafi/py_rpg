@@ -49,6 +49,16 @@ class Tilemap:
     def set(self, x: int, y: int, value: int):
         self.tiles[y][x] = value
 
+    def deselect(self):
+        self.selected_start = None
+        self.selected_end = None
+
+    def resize(self, cell_size: int, center_on: (int, int)):
+        self.cell_size = cell_size
+        self.rect.width = cell_size * self.width
+        self.rect.height = cell_size * self.height
+        self.set_rect_centered_on(center_on)
+
     def mouse_to_xy(self, pos: (int, int)) -> (int, int):
         x = int((pos[0] - self.rect.x) / self.cell_size)
         y = int((pos[1] - self.rect.y) / self.cell_size)
@@ -60,7 +70,22 @@ class Tilemap:
             self.tiles = self.prev_states.pop(idx)
 
     def push_prev(self):
-        self.prev_states.append(copy.deepcopy(self.tiles))
+        if len(self.prev_states) > 0:
+            if not self.compare_states(self.prev_states[-1], self.tiles):
+                print("Pushing state")
+                self.prev_states.append(copy.deepcopy(self.tiles))
+            else:
+                print("Ignoring state push")
+        else:
+            print("Pushing state")
+            self.prev_states.append(copy.deepcopy(self.tiles))
+
+    def compare_states(self, left, right) -> bool:
+        for y in range(self.height):
+            for x in range(self.width):
+                if left[y][x] != right[y][x]:
+                    return False
+        return True
 
     def get_sub_tiles(self, pos: (int, int), width: int, height: int) -> [[py.Surface]]:
         result = []
