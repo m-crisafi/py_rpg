@@ -46,6 +46,9 @@ class Tilemap:
         json.dump(to_write, f)
         f.close()
 
+    def set_point(self, pos: (int, int), value: int):
+        self.tiles[pos[1]][pos[0]] = value
+
     def set(self, x: int, y: int, value: int):
         self.tiles[y][x] = value
 

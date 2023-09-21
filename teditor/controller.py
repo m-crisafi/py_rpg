@@ -1,14 +1,17 @@
+from datetime import date
+
 import pygame as py
 
 from tilemap import Tilemap
 from tileset import *
 
 PADDING = 20
-SCREEN_H_MAX = 900
+SCREEN_H_MAX = 800 + PADDING * 2
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = SCREEN_H_MAX
 MAP_HEIGHT = SCREEN_H_MAX - PADDING * 2
-MAG_VALUES = [172, 86, 43, 20, 10]
+MAG_VALUES = [160, 100, 80, 50, 40, 32, 25, 20, 16, 10, 8, 5]
+MAG_START_IDX = 7
 
 TILEMAPS_FILEPATH = "../resources/maps/tm/"
 TILESETS_FILEPATH = "../resources/maps/ts/"
@@ -42,12 +45,13 @@ class Controller:
         self.mid_map = self.map_rect.midtop[0], self.map_rect.midleft[1]
         self.tilemap = Tilemap(pos, TILEMAPS_FILEPATH + "start.json")
 
+        self.last_clicked_cell = None
         self.copy_buffer = None
         self.running = True
         self.dragging = False
         self.selecting = False
         self.show_grid = False
-        self.selected_magnification = 3
+        self.selected_magnification = 7
         self.editing_passable = False
 
         self.cam_pos = [0, 0]
@@ -59,11 +63,8 @@ class Controller:
             self.render()
             self.handle_input()
 
-    def render(self):
-        self.screen.fill(BG_COLOR)
-        pos = py.mouse.get_pos()
-
-        # draw tiles
+    def draw_tileset(self):
+        # draw tileset
         for y in range(self.tileset.height):
             for x in range(self.tileset.width):
                 rect = py.Rect(
@@ -84,15 +85,20 @@ class Controller:
                            self.tileset.cell_size)
             py.draw.rect(self.screen, SELECTED_COLOR, rect, width=1)
 
-        # draw background
+    def render(self):
+        self.screen.fill(BG_COLOR)
+        pos = py.mouse.get_pos()
+
+        self.draw_tileset()
+
+        # draw map background
         py.draw.rect(self.screen, MAP_COLOR, self.map_rect)
         py.draw.rect(self.screen, BLACK, self.map_rect, width=1)
 
         # draw whole world
         for y in range(self.map_size):
             for x in range(self.map_size):
-                nx = x + self.cam_pos[0]
-                ny = y + self.cam_pos[1]
+                nx, ny = self.abs_to_camera_pos((x, y))
                 if self.tilemap.point_on_map(nx, ny):
                     rect = py.Rect(
                         x * self.tilemap.cell_size + self.tilemap.rect.x,
@@ -110,10 +116,10 @@ class Controller:
             self.draw_grid(self.map_rect, self.tilemap.cell_size, GRID_COLOR)
 
         # draw tile hover on map
-        if self.mouse_collides_with_rect(pos, self.tilemap.rect) and self.tileset.selected_tile is not None:
-            xy = self.tilemap.mouse_to_xy(pos)
-            rect = py.Rect(xy[0] * self.tilemap.cell_size + self.tilemap.rect.x,
-                           xy[1] * self.tilemap.cell_size + self.tilemap.rect.y,
+        if self.mouse_collides_with_tilemap(pos) and self.tileset.selected_tile is not None:
+            abs = self.mouse_to_xy(pos)
+            rect = py.Rect(abs[0] * self.tilemap.cell_size + self.tilemap.rect.x,
+                           abs[1] * self.tilemap.cell_size + self.tilemap.rect.y,
                            self.tilemap.cell_size,
                            self.tilemap.cell_size)
             surf = py.transform.scale(self.get_selected_tile(), (self.tilemap.cell_size, self.tilemap.cell_size))
@@ -188,18 +194,22 @@ class Controller:
                     self.running = False
                     return
 
+                if event.key == py.K_n:
+                    self.tilemap = Tilemap(pos, TILEMAPS_FILEPATH + "%s.json" % str(date.today()), width=50, height=50)
+                    self.tilemap.resize(self.get_selected_magnification())
+
                 if event.key == py.K_w:
-                    if self.cam_pos[1] > 0:
-                        self.cam_pos[1] -= 1
+                    # if self.cam_pos[1] > 0:
+                    self.cam_pos[1] -= 1
                 if event.key == py.K_s:
-                    if self.cam_pos[1] < self.map_size - 1:
-                        self.cam_pos[1] += 1
+                    # if self.cam_pos[1] < self.map_size - 1:
+                    self.cam_pos[1] += 1
                 if event.key == py.K_a:
-                    if self.cam_pos[0] > 0:
-                        self.cam_pos[0] -= 1
+                    # if self.cam_pos[0] > 0:
+                    self.cam_pos[0] -= 1
                 if event.key == py.K_d:
-                    if self.cam_pos[0] < self.map_size - 1:
-                        self.cam_pos[0] += 1
+                    # if self.cam_pos[0] < self.map_size - 1:
+                    self.cam_pos[0] += 1
 
                 if event.key == py.K_MINUS:
                     if self.selected_magnification < len(MAG_VALUES) - 1:
@@ -268,27 +278,26 @@ class Controller:
                             self.tileset.selected_tile = self.tileset.selected_tile[0] + 1, self.tileset.selected_tile[1]
 
             if self.dragging:
-                if self.mouse_collides_with_rect(pos, self.tilemap.rect):
-                    xy = self.tilemap.mouse_to_xy(pos)
+                if self.mouse_collides_with_tilemap(pos):
+                    xy = self.mouse_to_xy(pos)
+                    abs = self.abs_to_camera_pos(xy)
                     # if a tile is selected, draw a preview
                     if self.tileset.selected_tile is not None:
                         self.tilemap.push_prev()
-                        self.tilemap.set(xy[0] + self.cam_pos[0], xy[1] + self.cam_pos[1],
-                                         self.tileset.selected_tile[1] * self.tileset.width +
-                                         self.tileset.selected_tile[0])
+                        self.tilemap.set_point(abs, self.tileset.selected_to_absolute())
                     elif not self.selecting:
-                        self.tilemap.selected_start = xy
-                        self.tilemap.selected_end = xy
+                        self.tilemap.selected_start = abs
+                        self.tilemap.selected_end = abs
                         self.selecting = True
                     elif self.selecting:
-                        self.tilemap.selected_end = (xy[0] + 1, xy[1] + 1)
+                        self.tilemap.selected_end = (abs[0] + 1, abs[1] + 1)
 
             if event.type == py.MOUSEBUTTONDOWN:
 
                 self.dragging = True
+                state = py.mouse.get_pressed()
 
                 # if right mouse clicked is pressed, cancel all selections
-                state = py.mouse.get_pressed()
                 if state[RIGHT_CLICK]:
                     self.dragging = False
                     self.tileset.selected_tile = None
@@ -303,21 +312,23 @@ class Controller:
                     if self.copy_buffer is not None:
                         x_len = len(self.copy_buffer[0])
                         y_len = len(self.copy_buffer)
-                        if self.mouse_collides_with_rect(pos, self.tilemap.rect):
-                            xy = self.tilemap.mouse_to_xy(pos)
+                        if self.mouse_collides_with_tilemap(pos):
+                            xy = self.mouse_to_xy(pos)
+                            cam = self.abs_to_camera_pos(xy)
                             self.tilemap.push_prev()
                             for y in range(y_len):
                                 for x in range(x_len):
-                                    if 0 <= (x + xy[0]) < self.tilemap.width and 0 <= (y + xy[1]) < self.tilemap.height:
-                                        self.tilemap.set(x + xy[0], y + xy[1], self.copy_buffer[y][x])
+                                    if 0 <= (x + cam[0]) < self.tilemap.width and 0 <= (y + cam[1]) < self.tilemap.height:
+                                        self.tilemap.set(x + cam[0], y + cam[1], self.copy_buffer[y][x])
                         return
 
                     # if no tile is selected and dragging, set tilemap selector start
                     if self.tileset.selected_tile is None and self.tilemap.selected_start is None:
                         if self.mouse_collides_with_rect(pos, self.tilemap.rect):
                             self.tilemap.selector_start = self.tilemap.mouse_to_xy(pos)
-                            self.tilemap.selector_end = self.tilemap.selector_start[0] + 1, self.tilemap.selector_start[
-                                1] + 1
+                            self.tilemap.selector_end = \
+                                self.tilemap.selector_start[0] + 1, \
+                                self.tilemap.selector_start[1] + 1
 
                     # if mouse is over tileset, select a tile
                     if self.mouse_collides_with_rect(pos, self.tileset.rect):
@@ -329,14 +340,12 @@ class Controller:
                         # if a tile is selected, draw a preview
                         if self.tileset.selected_tile is not None:
                             self.tilemap.push_prev()
-                            self.tilemap.set(xy[0], xy[1],
-                                             self.tileset.selected_tile[1] * self.tileset.width +
-                                             self.tileset.selected_tile[0])
+                            self.tilemap.set_point(self.abs_to_camera_pos(xy), self.tileset.selected_to_absolute())
 
             if event.type == py.MOUSEBUTTONUP:
                 # handle passable layer
                 if self.editing_passable:
-                    if self.mouse_collides_with_rect(pos, self.tilemap.rect):
+                    if self.mouse_collides_with_tilemap(pos):
                         if self.selecting:
                             pos = self.tilemap.selected_to_pos()
                             x_len = pos[1][0] - pos[0][0]
@@ -346,16 +355,16 @@ class Controller:
                             for y in range(pos[0][1], pos[0][1] + y_len):
                                 for x in range(pos[0][0], pos[0][0] + x_len):
                                     if 0 <= x < self.tilemap.width and 0 <= y < self.tilemap.height:
-                                        self.tilemap.invert_passable(self.pos_to_camera_pos((x, y)))
+                                        self.tilemap.invert_passable(self.abs_to_camera_pos((x, y)))
                         else:
                             xy = self.tilemap.mouse_to_xy(pos)
-                            self.tilemap.invert_passable(self.pos_to_camera_pos(xy))
+                            self.tilemap.invert_passable(self.abs_to_camera_pos(xy))
                     self.tilemap.deselect()
 
                 self.dragging = False
                 self.selecting = False
 
-    def pos_to_camera_pos(self, pos: (int, int)):
+    def abs_to_camera_pos(self, pos: (int, int)):
         return pos[0] + self.cam_pos[0], pos[1] + self.cam_pos[1]
 
     def get_selected_magnification(self):
@@ -363,6 +372,24 @@ class Controller:
 
     def get_selected_tile(self) -> py.Surface:
         return self.tileset.tiles[self.tileset.selected_tile[1]][self.tileset.selected_tile[0]]
+
+    def mouse_collides_with_tilemap(self, pos: (int, int)) -> bool:
+        if self.mouse_collides_with_map(pos):
+            rect = py.Rect(self.map_rect.x - (self.cam_pos[0] * self.tilemap.cell_size),
+                           self.map_rect.y - (self.cam_pos[1] * self.tilemap.cell_size),
+                           self.tilemap.rect.width,
+                           self.tilemap.rect.height)
+            return Controller.mouse_collides_with_rect(pos, rect)
+        else:
+            return False
+
+    def mouse_collides_with_map(self, pos: (int, int)) -> bool:
+        return Controller.mouse_collides_with_rect(pos, self.map_rect)
+
+    def mouse_to_xy(self, pos: (int, int)):
+        x = int((pos[0] - self.map_rect.x) / self.get_selected_magnification())
+        y = int((pos[1] - self.map_rect.y) / self.get_selected_magnification())
+        return x, y
 
     @staticmethod
     def mouse_collides_with_rect(pos: tuple[int, int], rect: py.Rect) -> bool:

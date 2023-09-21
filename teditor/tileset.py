@@ -29,6 +29,9 @@ class Tileset:
         x, y = int(idx % self.width), int(idx / self.width)
         return self.tiles[y][x]
 
+    def selected_to_absolute(self):
+        return self.selected_tile[1] * self.width + self.selected_tile[0]
+
     def mouse_to_xy(self, pos: (int, int)) -> (int, int):
         x = int((pos[0] - self.rect.x) / self.cell_size)
         y = int((pos[1] - self.rect.y) / self.cell_size)
