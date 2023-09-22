@@ -2,6 +2,7 @@ from datetime import date
 
 import pygame as py
 
+from teditor.copy_buffer import CopyBuffer
 from tilemap import Tilemap
 from tileset import *
 
@@ -45,8 +46,8 @@ class Controller:
         self.mid_map = self.map_rect.midtop[0], self.map_rect.midleft[1]
         self.tilemap = Tilemap(pos, TILEMAPS_FILEPATH + "start.json")
 
-        self.last_clicked_cell = None
-        self.copy_buffer = None
+        self.last_clicked_cell: (int, int) or None = None
+        self.copy_buffer: CopyBuffer or None = None
         self.running = True
         self.dragging = False
         self.selecting = False
@@ -248,11 +249,7 @@ class Controller:
                 # copy selected on c
                 if event.key == py.K_c:
                     if self.tilemap.selected_start is not None and self.tilemap.selected_end is not None:
-                        pos = self.tilemap.selected_to_pos()
-                        width = pos[1][0] - pos[0][0]
-                        height = pos[1][1] - pos[0][1]
-                        pos = pos[0][0] + self.cam_pos[0], pos[0][1] + self.cam_pos[1]
-                        self.copy_buffer = self.tilemap.get_sub_tiles(pos, width, height)
+                        self.load_copy_buffer()
                         self.selecting = False
                         self.tilemap.selected_start = None
                         self.tilemap.selected_end = None
@@ -310,16 +307,16 @@ class Controller:
 
                     # if copying
                     if self.copy_buffer is not None:
-                        x_len = len(self.copy_buffer[0])
-                        y_len = len(self.copy_buffer)
                         if self.mouse_collides_with_tilemap(pos):
+                            x_len = len(self.copy_buffer.width)
+                            y_len = len(self.copy_buffer.height)
                             xy = self.mouse_to_xy(pos)
                             cam = self.abs_to_camera_pos(xy)
                             self.tilemap.push_prev()
                             for y in range(y_len):
                                 for x in range(x_len):
                                     if 0 <= (x + cam[0]) < self.tilemap.width and 0 <= (y + cam[1]) < self.tilemap.height:
-                                        self.tilemap.set(x + cam[0], y + cam[1], self.copy_buffer[y][x])
+                                        self.tilemap.set(x + cam[0], y + cam[1], self.copy_buffer.tileset_ids[y][x])
                         return
 
                     # if no tile is selected and dragging, set tilemap selector start
@@ -363,6 +360,23 @@ class Controller:
 
                 self.dragging = False
                 self.selecting = False
+
+    def load_copy_buffer(self):
+        pos = self.tilemap.selected_to_pos()
+        width = pos[1][0] - pos[0][0] + 1
+        height = pos[1][1] - pos[0][1] + 1
+        self.copy_buffer = CopyBuffer(width, height)
+        pos = pos[0][0] + self.cam_pos[0], pos[0][1] + self.cam_pos[1]
+        sub_tiles = self.tilemap.get_sub_tiles(pos, width, height)
+        for y in range(height):
+            imgs = []
+            ids = []
+            for x in range(width):
+                surf = py.transform.scale(sub_tiles[y][x], (self.tilemap.cell_size, self.tilemap.cell_size))
+                imgs.append(surf)
+                ids.append(sub_tiles[y][x])
+            self.copy_buffer.scaled_buffer.append(imgs)
+            self.copy_buffer.tileset_ids(ids)
 
     def abs_to_camera_pos(self, pos: (int, int)):
         return pos[0] + self.cam_pos[0], pos[1] + self.cam_pos[1]
