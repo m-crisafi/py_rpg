@@ -1,7 +1,5 @@
-from src.models.tilemap import Tilemap
+from src.game import Game
 
 
 if __name__ == '__main__':
-    t = Tilemap("../resources/castle.tmx")
-    print("Main")
-
+    game = Game()

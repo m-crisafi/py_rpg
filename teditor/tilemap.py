@@ -1,48 +1,49 @@
 import copy
+import os
 
 import pygame as py
 import json
 
+from src import utils
+
 
 class Tilemap:
 
-    def __init__(self, pos: (int, int), filename: str, width: int = -1, height: int = -1, cell_size: int = -1):
+    def __init__(self, filename: str, cell_size: int, width: int = -1, height: int = -1, tileset_filename: str = ""):
         self.filename = filename
         self.tiles = []
+        self.pathable = []
         self.prev_states = []
-        self.passable_layer = []
+        self.cell_size = cell_size
         self.selected_start = None
         self.selected_end = None
 
-        if width != -1:
+        if not os.path.exists("../resources/maps/tm/" + self.filename):
             self.width = width
             self.height = height
+            self.tileset_filename = tileset_filename
             self.tiles = [[0 for x in range(self.width)] for y in range(self.height)]
-            self.passable_layer = [[True for x in range(self.width)] for y in range(self.height)]
-            self.cell_size = cell_size
+            self.pathable = [[True for x in range(self.width)] for y in range(self.height)]
         else:
-            f = open(self.filename)
-            j = json.load(f)
-            f.close()
-            self.tiles = j["tiles"]
-            self.passable_layer = j["passable_layer"]
-            self.width = j["width"]
-            self.height = j["height"]
-            self.cell_size = j["cell_size"]
+            obj = utils.load_json("../resources/maps/tm/" + self.filename)
+            self.tiles = obj["tiles"]
+            self.tileset_filename = obj["tileset_filename"]
+            self.pathable = obj["passable_layer"]
+            self.width = obj["width"]
+            self.height = obj["height"]
 
-        self.rect = py.Rect(pos[0], pos[1], self.cell_size * self.width, self.cell_size * self.height)
+        self.rect = py.Rect(0, 0, self.cell_size * self.width, self.cell_size * self.height)
 
-    def save(self, tileset_filename: str):
+    def save(self):
         to_write = {
-            "filename": self.filename,
-            "tileset_filename": tileset_filename,
+            "tileset_filename": self.tileset_filename,
             "width": self.width,
             "height": self.height,
             "cell_size": self.cell_size,
             "tiles": self.tiles,
-            "passable_layer": self.passable_layer
+            "passable_layer": self.pathable
         }
-        f = open(self.filename, 'w')
+        f = open("../resources/maps/tm/" + self.filename, 'w')
         json.dump(to_write, f)
         f.close()
 
@@ -52,8 +53,11 @@ class Tilemap:
     def set(self, x: int, y: int, value: int):
         self.tiles[y][x] = value
 
-    def invert_passable(self, pos: (int, int)):
-        self.passable_layer[pos[1]][pos[0]] = not self.passable_layer[pos[1]][pos[0]]
+    def invert_pathable(self, pos: (int, int)):
+        self.pathable[pos[1]][pos[0]] = not self.pathable[pos[1]][pos[0]]
+
+    def set_pathable(self, pos: (int, int), value: bool):
+        self.pathable[pos[1]][pos[0]] = value
 
     def deselect(self):
         self.selected_start = None

@@ -1,5 +1,7 @@
+import math
 from datetime import date
 
+import numpy as numpy
 import pygame as py
 
 from teditor.copy_buffer import CopyBuffer
@@ -14,13 +16,12 @@ MAP_HEIGHT = SCREEN_H_MAX - PADDING * 2
 MAG_VALUES = [160, 100, 80, 50, 40, 32, 25, 20, 16, 10, 8, 5]
 MAG_START_IDX = 7
 
-TILEMAPS_FILEPATH = "../resources/maps/tm/"
-TILESETS_FILEPATH = "../resources/maps/ts/"
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-SELECTED_COLOR = (0, 255, 0)
-GRID_COLOR = (140, 140, 140)
-MAP_COLOR = (190, 190, 190)
+WHITE = (255, 255, 255, 255)
+BLACK = (0, 0, 0, 255)
+SELECTED_COLOR = (0, 255, 0, 255)
+GRID_COLOR = (140, 140, 140, 255)
+MAP_COLOR = (190, 190, 190, 255)
+ALPHA = 200
 BG_COLOR = WHITE
 
 TILESET_START = (20, 20)
@@ -34,7 +35,7 @@ class Controller:
 
     def __init__(self):
         self.screen = py.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self.tileset = Tileset(TILESETS_FILEPATH + "castle.png", 20, TILESET_START)
+        self.tileset = Tileset("castle.json", 30, TILESET_START)
         pos = (self.tileset.rect.x + self.tileset.rect.width + PADDING, TILESET_START[1])
 
         self.map_rect = py.Rect(
@@ -43,15 +44,16 @@ class Controller:
             MAP_HEIGHT,
             MAP_HEIGHT)
 
+        self.selected_magnification = 7
         self.mid_map = self.map_rect.midtop[0], self.map_rect.midleft[1]
-        self.tilemap = Tilemap(pos, TILEMAPS_FILEPATH + "start.json")
+        self.tilemap = Tilemap("start.json", self.get_selected_magnification())
 
         self.last_clicked_cell: (int, int) or None = None
+        self.last_clicked_abs: (int, int) or None = None
         self.copy_buffer: CopyBuffer or None = None
         self.running = True
         self.selecting = False
         self.show_grid = False
-        self.selected_magnification = 7
         self.editing_passable = False
 
         self.cam_pos = [0, 0]
@@ -72,7 +74,7 @@ class Controller:
                     y * self.tileset.cell_size + self.tileset.rect.y,
                     self.tileset.cell_size,
                     self.tileset.cell_size)
-                self.screen.blit(self.tileset.tiles[y][x], rect)
+                self.screen.blit(self.tileset.tiles[y][x].scaled, rect)
 
         # draw tileset grid
         self.draw_grid(self.tileset.rect, self.tileset.cell_size, BLACK)
@@ -103,22 +105,28 @@ class Controller:
                     rect = self.get_map_rect_from_xy((x, y))
                     idx = self.tilemap.tiles[ny][nx]
                     xy = Controller.flattened_to_xy(idx, self.tileset.width)
-                    surf = self.tileset.tiles[xy[1]][xy[0]]
+                    surf = self.tileset.tiles[xy[1]][xy[0]].surf
                     surf = py.transform.scale(surf, (self.tilemap.cell_size, self.tilemap.cell_size))
                     self.screen.blit(surf, rect)
 
-                    if self.editing_passable and not self.tilemap.passable_layer[ny][nx]:
-                        py.draw.rect(self.screen, (150, 150, 150), rect)
+                    if self.editing_passable and not self.tilemap.pathable[ny][nx]:
+                        alpha_surf = py.Surface((self.tilemap.cell_size, self.tilemap.cell_size), py.SRCALPHA)
+                        py.draw.rect(alpha_surf, (150, 150, 150, ALPHA), (0, 0, self.tilemap.cell_size, self.tilemap.cell_size))
+                        py.draw.rect(alpha_surf, (255, 0, 0, 255), (0, 0, self.tilemap.cell_size, self.tilemap.cell_size), width=1)
+                        self.screen.blit(alpha_surf, rect)
 
         if self.editing_passable:
             for y in range(self.tileset.height):
                 for x in range(self.tileset.width):
-                    if not self.tileset.tile_is_pathable((x, y)):
+                    if not self.tileset.tile_at((x, y)).pathable:
                         rect = py.Rect(self.tileset.rect.x + x * self.tileset.cell_size,
                                        self.tileset.rect.y + y * self.tileset.cell_size,
-                                       self.tilemap.cell_size,
-                                       self.tilemap.cell_size)
-                        py.draw.rect(self.screen, (150, 150, 150), rect)
+                                       self.tileset.cell_size,
+                                       self.tileset.cell_size)
+                        alpha_surf = py.Surface((self.tileset.cell_size, self.tileset.cell_size), py.SRCALPHA)
+                        py.draw.rect(alpha_surf, (150, 150, 150, ALPHA), (0, 0, self.tileset.cell_size, self.tileset.cell_size))
+                        py.draw.rect(alpha_surf, (255, 0, 0, 255), (0, 0, self.tileset.cell_size, self.tileset.cell_size), width=1)
+                        self.screen.blit(alpha_surf, rect)
 
         # draw grids if true
         if self.show_grid:
@@ -131,7 +139,7 @@ class Controller:
                 abs = self.mouse_to_xy(pos)
                 rect = self.get_map_rect_from_xy(abs)
                 surf = py.transform.scale(
-                    self.tileset.get_selected_tile(),
+                    self.tileset.get_selected_tile().surf,
                     (self.tilemap.cell_size, self.tilemap.cell_size)
                 )
                 self.screen.blit(surf, rect)
@@ -142,22 +150,37 @@ class Controller:
                 cam = p[0][0] - self.cam_pos[0], p[0][1] - self.cam_pos[1]
                 width = p[1][0] - p[0][0] + 1
                 height = p[1][1] - p[0][1] + 1
+
+                if self.tileset.selected_tile is not None:
+                    surf = py.transform.scale(
+                        self.tileset.get_selected_tile().surf,
+                        (self.tilemap.cell_size, self.tilemap.cell_size)
+                    )
+                    for y in range(height):
+                        for x in range(width):
+                            new_p = cam[0] + x, cam[1] + y
+                            rect = self.get_map_rect_from_xy(new_p)
+                            self.screen.blit(surf, rect)
+
                 rect = self.get_map_rect_from_xy(cam, width, height)
                 self.draw_grid(rect, self.tilemap.cell_size, (255, 255, 255))
 
             # draw copy buffer if it exists
             if self.copy_buffer is not None:
-                abs = self.mouse_to_camera_pos(pos)
+                xy = self.mouse_to_xy(pos)
+                p = self.mouse_to_camera_pos(pos)
+
                 for y in range(self.copy_buffer.height):
                     for x in range(self.copy_buffer.width):
-                        rect = self.get_map_rect_from_xy((abs[0] + x, abs[1] + y))
-                        surf = self.copy_buffer.scaled_buffer[y][x]
-                        self.screen.blit(surf, rect)
-                rect = self.get_map_rect_from_xy(abs, self.copy_buffer.width, self.copy_buffer.height)
+                        if self.tilemap.point_on_map(p[0] + x, p[1] + y):
+                            rect = self.get_map_rect_from_xy((xy[0] + x, xy[1] + y))
+                            surf = self.copy_buffer.scaled_buffer[y][x]
+                            self.screen.blit(surf, rect)
+                rect = self.get_map_rect_from_xy(xy, self.copy_buffer.width, self.copy_buffer.height)
                 self.draw_grid(rect, self.tilemap.cell_size, (255, 255, 255))
 
             # draw hover
-            if not self.selecting and self.tileset.selected_tile is None:
+            if not self.selecting and self.tileset.selected_tile is None and self.copy_buffer is None:
                 abs = self.mouse_to_xy(pos)
                 rect = self.get_map_rect_from_xy(abs)
                 py.draw.rect(self.screen, (160, 160, 160), rect, 1)
@@ -165,6 +188,7 @@ class Controller:
         py.display.flip()
 
     def handle_input(self):
+
         for event in py.event.get():
             pos = py.mouse.get_pos()
             xy = self.mouse_to_xy(pos)
@@ -199,8 +223,13 @@ class Controller:
 
                 # new map on n
                 if event.key == py.K_n:
-                    self.tilemap = Tilemap(pos, TILEMAPS_FILEPATH + "%s.json" % str(date.today()), width=50, height=50)
+                    self.tilemap = Tilemap(
+                        "%s.json" % str(date.today()),
+                        width=50,
+                        height=30,
+                        tileset_filename="castle.png")
                     self.tilemap.resize(self.get_selected_magnification())
+                    self.cam_pos = [0, 0]
 
                 # move cam on wasd
                 if event.key == py.K_w:
@@ -232,7 +261,8 @@ class Controller:
 
                 # save map on F
                 if event.key == py.K_f:
-                    self.tilemap.save(self.tileset.filename)
+                    self.tilemap.save()
+                    self.tileset.save()
                     print("Map saved [%s]" % self.tileset.filename)
 
                 # copy tile on left shift
@@ -260,14 +290,15 @@ class Controller:
 
                 # handle UP/DOWN/LEFT/RIGHT
                 if self.tileset.selected_tile is not None:
-                    if event.key == py.K_UP and self.tileset.selected_tile[1] - 1 >= 0:
-                        self.tileset.selected_tile = self.tileset.selected_tile[0], self.tileset.selected_tile[1] - 1
-                    if event.key == py.K_DOWN and self.tileset.selected_tile[1] + 1 < self.tileset.height:
-                        self.tileset.selected_tile = self.tileset.selected_tile[0], self.tileset.selected_tile[1] + 1
-                    if event.key == py.K_LEFT and self.tileset.selected_tile[0] - 1 >= 0:
-                        self.tileset.selected_tile = self.tileset.selected_tile[0] - 1, self.tileset.selected_tile[1]
-                    if event.key == py.K_RIGHT and self.tileset.selected_tile[0] + 1 < self.tileset.width:
-                        self.tileset.selected_tile = self.tileset.selected_tile[0] + 1, self.tileset.selected_tile[1]
+                    x, y = self.tileset.selected_tile
+                    if event.key == py.K_UP and y - 1 >= 0:
+                        self.tileset.selected_tile = x, y - 1
+                    if event.key == py.K_DOWN and y + 1 < self.tileset.height:
+                        self.tileset.selected_tile = x, y + 1
+                    if event.key == py.K_LEFT and x - 1 >= 0:
+                        self.tileset.selected_tile = x - 1, y
+                    if event.key == py.K_RIGHT and x + 1 < self.tileset.width:
+                        self.tileset.selected_tile = x + 1, y
 
             """
             If mouse is dragging            
@@ -281,11 +312,14 @@ class Controller:
 
                 # if right mouse clicked is pressed, cancel all selections
                 if state[RIGHT_CLICK]:
-                    self.tileset.selected_tile = None
-                    self.deselect()
-                    self.copy_buffer = None
-                    return
 
+                    if self.tileset.selected_tile is not None or self.copy_buffer is not None or self.selecting:
+                        self.tileset.selected_tile = None
+                        self.deselect()
+                        self.copy_buffer = None
+                        return
+
+                # if left click was pressed
                 if state[LEFT_CLICK]:
 
                     # if copying
@@ -294,12 +328,12 @@ class Controller:
                             self.tilemap.push_prev()
                             for y in range(self.copy_buffer.height):
                                 for x in range(self.copy_buffer.width):
-                                    nx, ny = x + abs[0], y + abs[1]
-                                    if Controller.pos_in_range((nx, ny), self.tilemap.width, self.tilemap.height):
+                                    nx, ny = abs
+                                    p = (nx + x, ny + y)
+                                    if self.tilemap.point_on_map(p[0], p[1]) and self.map_point_visible(p):
                                         id = self.copy_buffer.tileset_ids[y][x]
-                                        self.tilemap.set(nx, ny, id)g
-                                        idx = Controller.flattened_to_xy(id, self.tileset.width)
-                                        self.tilemap.passable_layer[ny][nx] = self.tileset.pathable_tiles[idx[1]][idx[0]]
+                                        self.tilemap.set_point(p, id)
+                                        self.tilemap.set_pathable(p, self.tileset.tile_by_flattened_idx(id).pathable)
                             self.tilemap.deselect()
                         return
 
@@ -335,13 +369,34 @@ class Controller:
                         for x in range(p[0][0], p[0][0] + x_len):
                             if self.tilemap.point_on_map(x, y):
                                 if self.editing_passable:
-                                    self.tilemap.invert_passable((x, y))
+                                    self.tilemap.invert_pathable((x, y))
                                 elif self.tileset.selected_tile is not None:
-                                    self.tilemap.set_point((x, y), self.tileset.selected_to_absolute())
+                                    self.tilemap.set_point((x, y), self.tileset.selected_to_flattened())
                                     pathable = self.tileset.tile_is_pathable(self.tileset.selected_tile)
-                                    self.tilemap.passable_layer[y][x] = pathable
+                                    self.tilemap.pathable[y][x] = pathable
                     if self.tileset.selected_tile is not None or self.editing_passable:
                         self.deselect()
+
+            if state[RIGHT_CLICK]:
+                if self.last_clicked_abs is None:
+                    self.last_clicked_abs = xy
+                elif xy != self.last_clicked_abs:
+                    if xy[0] < self.last_clicked_abs[0]:
+                        self.cam_pos[0] += 1
+                    elif xy[0] > self.last_clicked_abs[0]:
+                        self.cam_pos[0] -= 1
+                    elif xy[1] < self.last_clicked_abs[1]:
+                        self.cam_pos[1] += 1
+                    elif xy[1] > self.last_clicked_abs[1]:
+                        self.cam_pos[1] -= 1
+                    self.last_clicked_abs = xy
+                    return
+
+    def map_point_visible(self, point: (int, int)) -> bool:
+        width = self.map_rect.width / self.tilemap.cell_size
+        height = self.map_rect.height / self.tilemap.cell_size
+        return self.cam_pos[0] <= point[0] < width + self.cam_pos[1] and \
+               self.cam_pos[1] <= point[1] < height + self.cam_pos[1]
 
     def get_map_rect_from_xy(self, pos: (int, int), width: int = 1, height: int = 1) -> py.Rect:
         return py.Rect(
