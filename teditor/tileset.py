@@ -11,7 +11,17 @@ class Tileset:
         self.height = 0
         self.selected_tile = None
         self.load_tiles()
+        self.pathable_tiles = [[True for x in range(self.width)] for y in range(self.height)]
         self.rect = py.Rect(pos[0], pos[1], cell_size * self.width, cell_size * self.height)
+
+    def select_tile_pathable(self) -> bool:
+        return self.pathable_tiles[self.selected_tile[1]][self.selected_tile[0]]
+
+    def flip_pathable(self, pos: (int, int)):
+        self.pathable_tiles[pos[1]][pos[0]] = not self.pathable_tiles[pos[1]][pos[0]]
+
+    def tile_is_pathable(self, pos: (int, int)) -> bool:
+        return self.pathable_tiles[pos[1]][pos[0]]
 
     def tile_at(self, xy: tuple[int, int]) -> py.Surface:
         return self.tiles[xy[1]][xy[0]]
@@ -21,6 +31,9 @@ class Tileset:
 
     def select_tile(self, pos: tuple[int, int]):
         self.selected_tile = pos
+
+    def select_tile_by_flattened_index(self, idx: int):
+        self.selected_tile = int(idx % self.width), int(idx / self.width)
 
     def deselect(self):
         self.selected_tile = None
