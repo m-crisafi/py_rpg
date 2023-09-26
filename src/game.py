@@ -34,7 +34,7 @@ class Game:
                 t = self.tm.tile_at(p)
                 self.screen.blit(t.surface, rect)
             else:
-                py.draw.rect(self.screen, COLOR_BLACK, rect)
+                self.screen.blit(self.tm.fill_surf, rect)
 
     def render(self):
         self.screen.fill(COLOR_WHITE)

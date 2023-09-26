@@ -19,6 +19,7 @@ class Tilemap:
         self.height = obj["height"]
         self.tiles = obj["tiles"]
         self.tileset = self.load_tiles(obj["tileset_filename"])
+        self.fill_surf = self.tileset[self.tiles[0][0]].surface
 
     def tile_at(self, p: (int, int)) -> Tile:
         idx = self.tiles[p[1]][p[0]]

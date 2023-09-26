@@ -2,6 +2,10 @@ import json
 import pygame as py
 
 
+def flattened_to_xy(idx: int, width: int) -> (int, int):
+    return int(idx % width), int(idx / width)
+
+
 def load_json(filepath: str):
     with open(filepath, "r") as file:
         return json.load(file)

@@ -16,18 +16,37 @@ class Tile:
 
 class Tileset:
 
-    def __init__(self, filename: str, cell_size: int, pos: (int, int)):
+    def __init__(self, cell_size: int):
+        self.filename: str = ""
+        self.png_name: str = ""
+        self.width: int = -1
+        self.height: int = -1
+        self.tiles: [Tile] = []
+        self.base_size: int = 0
+        self.cell_size: int = cell_size
+        self.selected_tile: (int, int) = None
+        self.rect: py.Rect = py.Rect(1, 1, 1, 1)
+
+    def load(self, filename: str, pos: (int, int)):
         self.filename = filename
         obj = utils.load_json("../resources/maps/ts/" + self.filename)
         self.png_name = obj['png_name']
         self.width = obj['width']
         self.height = obj['height']
         self.tiles: [Tile] = []
-        self.base_size = 0
-        self.cell_size = cell_size
         self.selected_tile = None
         self.load_tiles(obj['pathable'])
-        self.rect = py.Rect(pos[0], pos[1], cell_size * self.width, cell_size * self.height)
+        self.rect = py.Rect(pos[0], pos[1], self.cell_size * self.width, self.cell_size * self.height)
+
+    def new(self, filename: str, png_filepath: str, width: int, height: int, pos: (int, int)):
+        self.filename = filename
+        self.png_name = png_filepath
+        self.width = width
+        self.height = height
+        self.tiles: [Tile] = []
+        self.selected_tile = None
+        self.load_tiles()
+        self.rect = py.Rect(pos[0], pos[1], self.cell_size * self.width, self.cell_size * self.height)
 
     def save(self):
         to_write = {
@@ -73,7 +92,7 @@ class Tileset:
         y = int((p[1] - self.rect.y) / self.cell_size)
         return x, y
 
-    def load_tiles(self, pathable: [[bool]]):
+    def load_tiles(self, pathable: [[bool]] = None):
         im = py.image.load("../resources/maps/images/" + self.png_name)
         self.base_size = im.get_width() / self.width
         for y in range(self.height):
@@ -82,6 +101,9 @@ class Tileset:
                 rect = py.Rect(x * self.base_size, y * self.base_size, self.base_size, self.base_size)
                 surf = im.subsurface(rect)
                 scaled = py.transform.scale(surf, (self.cell_size, self.cell_size))
-                t = Tile(y * self.width + x, pathable[y][x], surf, scaled)
+                if pathable is not None:
+                    t = Tile(y * self.width + x, pathable[y][x], surf, scaled)
+                else:
+                    t = Tile(y * self.width + x, True, surf, scaled)
                 line.append(t)
             self.tiles.append(line)

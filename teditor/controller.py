@@ -4,7 +4,6 @@ from datetime import date
 import numpy as numpy
 import pygame as py
 
-from teditor.copy_buffer import CopyBuffer
 from tilemap import Tilemap
 from tileset import *
 
@@ -31,11 +30,22 @@ MIDDLE_CLICK = 1
 RIGHT_CLICK = 2
 
 
+class CopyBuffer:
+
+    def __init__(self, width: int, height: int):
+        self.width = width
+        self.height = height
+        self.scaled_buffer = [[None for x in range(width)] for y in range(height)]
+        self.tileset_ids = [[-1 for x in range(width)] for y in range(height)]
+
+
 class Controller:
 
     def __init__(self):
         self.screen = py.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self.tileset = Tileset("castle.json", 30, TILESET_START)
+        self.tileset = Tileset(30)
+        #self.tileset.new("town.json", "town.png", 16, 10, TILESET_START)
+        self.tileset.load("town.json", TILESET_START)
         pos = (self.tileset.rect.x + self.tileset.rect.width + PADDING, TILESET_START[1])
 
         self.map_rect = py.Rect(
@@ -46,7 +56,7 @@ class Controller:
 
         self.selected_magnification = 7
         self.mid_map = self.map_rect.midtop[0], self.map_rect.midleft[1]
-        self.tilemap = Tilemap("start.json", self.get_selected_magnification())
+        self.tilemap = Tilemap("start.json", self.get_selected_magnification(), 50, 50, "town.json")
 
         self.last_clicked_cell: (int, int) or None = None
         self.last_clicked_abs: (int, int) or None = None
@@ -226,8 +236,8 @@ class Controller:
                     self.tilemap = Tilemap(
                         "%s.json" % str(date.today()),
                         width=50,
-                        height=30,
-                        tileset_filename="castle.png")
+                        height=50,
+                        tileset_filename="forest.png")
                     self.tilemap.resize(self.get_selected_magnification())
                     self.cam_pos = [0, 0]
 
@@ -372,7 +382,7 @@ class Controller:
                                     self.tilemap.invert_pathable((x, y))
                                 elif self.tileset.selected_tile is not None:
                                     self.tilemap.set_point((x, y), self.tileset.selected_to_flattened())
-                                    pathable = self.tileset.tile_is_pathable(self.tileset.selected_tile)
+                                    pathable = self.tileset.get_selected_tile().pathable
                                     self.tilemap.pathable[y][x] = pathable
                     if self.tileset.selected_tile is not None or self.editing_passable:
                         self.deselect()
@@ -427,7 +437,7 @@ class Controller:
         for y in range(height):
             for x in range(width):
                 tile_idx = sub_tiles[y][x]
-                surf = py.transform.scale(self.tileset.tile_by_flattened_idx(tile_idx),
+                surf = py.transform.scale(self.tileset.tile_by_flattened_idx(tile_idx).surf,
                                           (self.tilemap.cell_size, self.tilemap.cell_size))
                 self.copy_buffer.scaled_buffer[y][x] = surf
                 self.copy_buffer.tileset_ids[y][x] = tile_idx
