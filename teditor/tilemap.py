@@ -18,14 +18,14 @@ class Tilemap:
         self.selected_start = None
         self.selected_end = None
 
-        if not os.path.exists("../resources/maps/tm/" + self.filename):
+        if not os.path.exists("resources/maps/tm/" + self.filename):
             self.width = width
             self.height = height
             self.tileset_filename = tileset_filename
             self.tiles = [[0 for x in range(self.width)] for y in range(self.height)]
             self.pathable = [[True for x in range(self.width)] for y in range(self.height)]
         else:
-            obj = utils.load_json("../resources/maps/tm/" + self.filename)
+            obj = utils.load_json("resources/maps/tm/" + self.filename)
             self.tiles = obj["tiles"]
             self.tileset_filename = obj["tileset_filename"]
             self.pathable = obj["passable_layer"]
@@ -43,7 +43,7 @@ class Tilemap:
             "tiles": self.tiles,
             "passable_layer": self.pathable
         }
-        f = open("../resources/maps/tm/" + self.filename, 'w')
+        f = open("resources/maps/tm/" + self.filename, 'w')
         json.dump(to_write, f)
         f.close()
 

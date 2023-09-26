@@ -16,7 +16,7 @@ class Tile:
 
 class Tileset:
 
-    def __init__(self, cell_size: int):
+    def __init__(self, cell_size: int, pos: (int, int)):
         self.filename: str = ""
         self.png_name: str = ""
         self.width: int = -1
@@ -25,20 +25,21 @@ class Tileset:
         self.base_size: int = 0
         self.cell_size: int = cell_size
         self.selected_tile: (int, int) = None
-        self.rect: py.Rect = py.Rect(1, 1, 1, 1)
+        self.rect: py.Rect = py.Rect(pos[0], pos[1], 1, 1)
 
-    def load(self, filename: str, pos: (int, int)):
+    def load(self, filename):
         self.filename = filename
-        obj = utils.load_json("../resources/maps/ts/" + self.filename)
+        obj = utils.load_json("resources/maps/ts/" + self.filename)
         self.png_name = obj['png_name']
         self.width = obj['width']
         self.height = obj['height']
         self.tiles: [Tile] = []
         self.selected_tile = None
         self.load_tiles(obj['pathable'])
-        self.rect = py.Rect(pos[0], pos[1], self.cell_size * self.width, self.cell_size * self.height)
+        self.rect.width = self.cell_size * self.width
+        self.rect.height = self.cell_size * self.height
 
-    def new(self, filename: str, png_filepath: str, width: int, height: int, pos: (int, int)):
+    def new(self, filename: str, png_filepath: str, width: int, height: int):
         self.filename = filename
         self.png_name = png_filepath
         self.width = width
@@ -46,7 +47,8 @@ class Tileset:
         self.tiles: [Tile] = []
         self.selected_tile = None
         self.load_tiles()
-        self.rect = py.Rect(pos[0], pos[1], self.cell_size * self.width, self.cell_size * self.height)
+        self.rect.width = self.cell_size * self.width
+        self.rect.height = self.cell_size * self.height
 
     def save(self):
         to_write = {
@@ -93,7 +95,7 @@ class Tileset:
         return x, y
 
     def load_tiles(self, pathable: [[bool]] = None):
-        im = py.image.load("../resources/maps/images/" + self.png_name)
+        im = py.image.load("resources/maps/images/" + self.png_name)
         self.base_size = im.get_width() / self.width
         for y in range(self.height):
             line = []

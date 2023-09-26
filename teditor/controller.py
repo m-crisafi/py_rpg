@@ -43,9 +43,9 @@ class Controller:
 
     def __init__(self):
         self.screen = py.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self.tileset = Tileset(30)
+        self.tileset = Tileset(30, TILESET_START)
         #self.tileset.new("town.json", "town.png", 16, 10, TILESET_START)
-        self.tileset.load("town.json", TILESET_START)
+        self.tileset.load("town.json")
         pos = (self.tileset.rect.x + self.tileset.rect.width + PADDING, TILESET_START[1])
 
         self.map_rect = py.Rect(
