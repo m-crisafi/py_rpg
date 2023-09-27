@@ -4,8 +4,8 @@ from models.tilemaps.tilemap import Tilemap
 from src.models.components.renderable_c import *
 from src.models.entities.player import Player
 
-MAP_SIZE = 31
-CELL_SIZE = 32
+MAP_SIZE = 21
+CELL_SIZE = 40
 DIMS = MAP_SIZE * CELL_SIZE, MAP_SIZE * CELL_SIZE
 
 COLOR_WHITE = (255, 255, 255)
@@ -18,7 +18,7 @@ class Game:
         self.screen: py.Surface = py.display.set_mode(DIMS)
         self.running: bool = True
         self.cam: [int, int] = [0, 0]
-        self.tm: Tilemap = Tilemap("resources/maps/tm/start.json", 32)
+        self.tm: Tilemap = Tilemap("resources/maps/tm/start.json", CELL_SIZE)
         self.entities = []
         self.player: Player = None
         self.center_on_pos((10, 10))
@@ -31,27 +31,55 @@ class Game:
             self.handle_input()
 
     def render_map(self):
-        for i in range(MAP_SIZE * MAP_SIZE):
-            x, y = int(i % MAP_SIZE), int(i / MAP_SIZE)
-            p = self.map_to_cam_pos((x, y))
-            rect = self.rect_from_pos((x, y))
-            if self.tm.is_in_bounds(p):
-                t = self.tm.tile_at(p)
-                self.screen.blit(t.surface, rect)
-            else:
-                self.screen.blit(self.tm.fill_surf, rect)
+        for y in range(MAP_SIZE):
+            for x in range(MAP_SIZE):
+                p = self.map_to_cam_pos((x, y))
+                rect = self.rect_from_pos((x, y))
+                if self.tm.is_in_bounds(p):
+                    surface = self.tm.surface_at(p)
+                    self.screen.blit(surface, rect)
+                else:
+                    self.screen.blit(self.tm.fill_surf, rect)
 
     def render(self):
         self.screen.fill(COLOR_WHITE)
         self.render_map()
         r = self.player.get_component_by_key(RENDER_COMPONENT_KEY)
-        self.screen.blit(r.getRenderable(), py.Rect(self.map_to_cam_pos((r.x, r.y)), CELL_SIZE, CELL_SIZE))
+        xy = r.xy()[0] - self.cam[0], r.xy()[1] - self.cam[1]
+        # xy = self.map_to_cam_pos(r.xy())
+        rect = py.Rect(abs(xy[0] * CELL_SIZE), abs(xy[1] * CELL_SIZE), CELL_SIZE, CELL_SIZE)
+        self.screen.blit(r.get_renderable(), rect)
         py.display.flip()
 
     def handle_input(self):
         for event in py.event.get():
             if event.type == py.QUIT:
                 self.running = False
+            if event.type == py.KEYDOWN:
+                r: RenderableComponent = self.player.get_component_by_key(RENDER_COMPONENT_KEY)
+                x, y = r.pos
+                if event.key == py.K_s:
+                    if self.tm.pathable_at((x, y + 1)):
+                        r.pos = (x, y + 1)
+                    r.direction = DIRECTION_SOUTH
+                    r.next_frame()
+                elif event.key == py.K_a:
+                    if self.tm.pathable_at((x - 1, y)):
+                        r.pos = (x - 1, y)
+                    r.direction = DIRECTION_WEST
+                    r.next_frame()
+                elif event.key == py.K_d:
+                    if self.tm.pathable_at((x + 1, y)):
+                        r.pos = (x + 1, y)
+                    r.direction = DIRECTION_EAST
+                    r.next_frame()
+                elif event.key == py.K_w:
+                    if self.tm.pathable_at((x, y - 1)):
+                        r.pos = (x, y - 1)
+                    r.direction = DIRECTION_NORTH
+                    r.next_frame()
+
+                self.center_on_pos(r.pos)
 
     def center_on_pos(self, p: (int, int)):
         self.cam[0] = p[0] - int(MAP_SIZE / 2)
@@ -65,7 +93,7 @@ class Game:
 
     def generate_test(self):
         self.player = Player(0, "player")
-        a = Animation("characters.png", 0, 3, 4)
-        r = RenderableComponent(1, None, 10, 10, DIRECTION_WEST, a)
+        a = Animation("characters.png", (0, 0), 3, 4, 32, CELL_SIZE)
+        r = RenderableComponent(1, None, [7, 7], DIRECTION_NORTH, a)
         self.player.add_component(r)
-        self.center_on_pos((r.x, r.y))
+        self.center_on_pos(r.xy())

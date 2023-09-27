@@ -57,7 +57,7 @@ class Tileset:
             "height": self.height,
             "pathable": [[self.tiles[y][x].pathable for x in range(self.width)] for y in range(self.height)]
         }
-        f = open("../resources/maps/ts/" + self.filename, 'w')
+        f = open("resources/maps/ts/" + self.filename, 'w')
         json.dump(to_write, f)
         f.close()
 

@@ -11,7 +11,7 @@ def load_json(filepath: str):
         return json.load(file)
 
 
-def sprite_from_sheet(filepath: str, p: (int, int), width: str, height: str, cell_size: int, scaled_size: int):
+def sprite_from_sheet(filepath: str, p: (int, int), width: int, height: int, cell_size: int, scaled_size: int):
     result = []
     im = py.image.load(filepath)
     for y in range(p[1], p[1] + height):

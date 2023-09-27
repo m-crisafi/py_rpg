@@ -28,7 +28,7 @@ class Tilemap:
             obj = utils.load_json("resources/maps/tm/" + self.filename)
             self.tiles = obj["tiles"]
             self.tileset_filename = obj["tileset_filename"]
-            self.pathable = obj["passable_layer"]
+            self.pathable = obj["pathable"]
             self.width = obj["width"]
             self.height = obj["height"]
 
@@ -41,7 +41,7 @@ class Tilemap:
             "height": self.height,
             "cell_size": self.cell_size,
             "tiles": self.tiles,
-            "passable_layer": self.pathable
+            "pathable": self.pathable
         }
         f = open("resources/maps/tm/" + self.filename, 'w')
         json.dump(to_write, f)
