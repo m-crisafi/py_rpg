@@ -4,7 +4,7 @@ from src.models.object import Object
 
 class Entity(Object):
 
-    def __init__(self, id: str, key: str):
+    def __init__(self, id: int, key: str):
         Object.__init__(self, id, key)
         self.components: [Component] = []
 

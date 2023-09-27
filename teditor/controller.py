@@ -9,7 +9,7 @@ from tileset import *
 
 PADDING = 20
 SCREEN_H_MAX = 800 + PADDING * 2
-SCREEN_WIDTH = 1500
+SCREEN_WIDTH = 1900
 SCREEN_HEIGHT = SCREEN_H_MAX
 MAP_HEIGHT = SCREEN_H_MAX - PADDING * 2
 MAG_VALUES = [160, 100, 80, 50, 40, 32, 25, 20, 16, 10, 8, 5]
@@ -44,8 +44,8 @@ class Controller:
     def __init__(self):
         self.screen = py.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.tileset = Tileset(30, TILESET_START)
-        #self.tileset.new("town.json", "town.png", 16, 10, TILESET_START)
-        self.tileset.load("town.json")
+        self.tileset.new("overworld.json", "overworld.png", 30, 16)
+        # self.tileset.load("town.json")
         pos = (self.tileset.rect.x + self.tileset.rect.width + PADDING, TILESET_START[1])
 
         self.map_rect = py.Rect(
@@ -56,7 +56,7 @@ class Controller:
 
         self.selected_magnification = 7
         self.mid_map = self.map_rect.midtop[0], self.map_rect.midleft[1]
-        self.tilemap = Tilemap("start.json", self.get_selected_magnification(), 50, 50, "town.json")
+        self.tilemap = Tilemap("new.json", self.get_selected_magnification(), 50, 50, "overworld.json")
 
         self.last_clicked_cell: (int, int) or None = None
         self.last_clicked_abs: (int, int) or None = None

@@ -96,7 +96,7 @@ class Tileset:
 
     def load_tiles(self, pathable: [[bool]] = None):
         im = py.image.load("resources/maps/images/" + self.png_name)
-        self.base_size = im.get_width() / self.width
+        self.base_size = int(im.get_width() / self.width)
         for y in range(self.height):
             line = []
             for x in range(self.width):
