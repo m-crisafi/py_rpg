@@ -26,7 +26,7 @@ class Entity(Object):
         return False
 
     def collides(self, pos: (int, int)):
-        return self.pos[0] == pos[0] and pos[1] == pos[1]
+        return self.pos[0] == pos[0] and self.pos[1] == pos[1]
 
     def xy(self) -> (int, int):
         return self.pos[0], self.pos[1]
@@ -35,6 +35,6 @@ class Entity(Object):
         result = Object.to_json(self)
         result["id"] = self.id
         result["pos"] = self.pos
-        reuslt["pathable"] = self.pathable
+        result["pathable"] = self.pathable
         result["components"] = [c.to_json() for c in self.components]
         return result

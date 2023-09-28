@@ -51,7 +51,7 @@ class RenderableComponent(Component):
 
     def to_json(self):
         result = Component.to_json(self)
-        result["direction:"] = self.direction
+        result["direction"] = self.direction
         if self.animation:
             result['animation'] = self.animation
         return result

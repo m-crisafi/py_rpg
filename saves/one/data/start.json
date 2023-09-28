@@ -1,0 +1,27 @@
+{
+  "entities": [
+    {
+      "id": 4,
+      "key": "door",
+      "pos": [
+        11,
+        9
+      ],
+      "pathable": true,
+      "components": [
+        {
+          "id": 2,
+          "key": "trigger_c",
+          "type": 0,
+          "payload": {
+            "target_map": "new.json",
+            "pos": [
+              10,
+              10
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

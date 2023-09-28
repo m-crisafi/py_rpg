@@ -3,6 +3,7 @@ from src.models.components.component import Component
 TRIGGER_COMPONENT_KEY = "trigger_c"
 
 TRIGGER_MOVE_TILEMAPS = 0
+TRIGGER_REMOVE_ENTITY = 1
 
 
 class TriggerComponent(Component):
@@ -16,3 +17,4 @@ class TriggerComponent(Component):
         result = Component.to_json(self)
         result["type"] = self.type
         result["payload"] = self.payload
+        return result

@@ -1,0 +1,16 @@
+{
+  "current_tilemap": "start.json",
+  "entity": {
+    "id": 0,
+    "key": "player",
+    "pos": [
+      7,
+      9
+    ],
+    "pathable": false,
+    "components": [
+      {
+        "id": 1,
+        "key": "render_c",
+        "direction": 0,
+        "animation":
