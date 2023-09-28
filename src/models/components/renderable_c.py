@@ -5,7 +5,7 @@ import pygame as py
 from src import utils
 from src.models.components.component import Component
 
-RENDER_COMPONENT_KEY = "r_component"
+RENDER_COMPONENT_KEY = "render_c"
 DIRECTION_SOUTH = 0
 DIRECTION_WEST = 1
 DIRECTION_EAST = 2
@@ -41,9 +41,8 @@ class Animation:
 
 class RenderableComponent(Component):
 
-    def __init__(self, id: int, surface: py.Surface, pos: [int, int], direction: int, animation: Animation = None):
+    def __init__(self, id: int, surface: py.Surface, direction: int, animation: Animation = None):
         Component.__init__(self, id, RENDER_COMPONENT_KEY)
-        self.pos = pos
         self.surface: py.Surface = surface
         self.direction = direction
         self.animation = animation
@@ -51,10 +50,8 @@ class RenderableComponent(Component):
             self.surface = self.animation.next_frame(direction)
 
     def to_json(self):
-        result = {
-            "pos": self.pos,
-            "direction:": self.direction,
-            }
+        result = Component.to_json(self)
+        result["direction:"] = self.direction
         if self.animation:
             result['animation'] = self.animation
         return result
@@ -65,6 +62,3 @@ class RenderableComponent(Component):
 
     def get_renderable(self) -> py.Surface:
         return self.surface
-
-    def xy(self) -> (int, int):
-        return self.pos[0], self.pos[1]
